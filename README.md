@@ -1,9 +1,38 @@
+# APACK
+
 APACK variant with timestamps.
 
 APACK is  an asynchronous header compression scheme inspired by HPACK.
 
 We assume some familirary with the HPACK compression scheme, but the
 text can be read without any detailed knowledge of HPACK.
+
+<!-- vim-markdown-toc GFM -->
+* [Background](#background)
+* [Overview](#overview)
+* [Security Considerations](#security-considerations)
+* [Differences from APACK with bitmaps](#differences-from-apack-with-bitmaps)
+* [Static Encoding](#static-encoding)
+    * [Streams](#streams)
+    * [Sessions](#sessions)
+    * [Implicit and Explicit Strings](#implicit-and-explicit-strings)
+    * [Name-Value List Encoding](#name-value-list-encoding)
+* [Data Structures](#data-structures)
+    * [The Static Table](#the-static-table)
+    * [The Dynamic Table](#the-dynamic-table)
+* [Basic Algorithm](#basic-algorithm)
+    * [Timestamps](#timestamps)
+    * [Encoding with Timestamps](#encoding-with-timestamps)
+    * [Updating Decoders Dynamic Table](#updating-decoders-dynamic-table)
+    * [Wrapping Timestamps](#wrapping-timestamps)
+    * [Resizing the Dynamic Table.](#resizing-the-dynamic-table)
+* [Active Reference Sets](#active-reference-sets)
+* [Wire Format](#wire-format)
+* [Pros and Cons of APACK](#pros-and-cons-of-apack)
+    * [Pros](#pros)
+    * [Cons](#cons)
+
+<!-- vim-markdown-toc -->
 
 ## Background
 
@@ -13,14 +42,6 @@ compressions.
 
 This text replaces an earlier APACK proposal that used bitmaps posted on the QUIC
 mailing list.
-
-The reason that bitmaps are no longer used is that the same behaviour
-could largely be optained simpler with timestamps. Timestamps and
-bitmaps both track a range of actually used cached slots in compression
-state. The timestamp provides a range and may have more false positives
-resulting in fewer slots being available for replacement with new
-values. But this can actually be a good thing because the encoder will
-then tend to prefer less recently used slots.
 
 
 ## Overview
@@ -78,6 +99,14 @@ know use timestamps instead where a timestamp is a counter, not the wall
 clock time. The basic concept remain the same, but the encoding and
 lookups are more efficient.
 
+The reason that bitmaps are no longer used is that the same behaviour
+could largely be optained simpler with timestamps. Timestamps and
+bitmaps both track a range of actually used cached slots in compression
+state. The timestamp provides a range and may have more false positives
+resulting in fewer slots being available for replacement with new
+values. But this can actually be a good thing because the encoder will
+then tend to prefer less recently used slots.
+
 
 ## Static Encoding
 
@@ -93,15 +122,6 @@ table also known from HPACK. When, occasionally, space or security
 considerations make encoding using the dynamic table infeasible or
 less preferable, we use the static and explicit communication but
 ultimiately allow an implementation to make its own calls.
-
-
-## Basic Algorithm
-
-_We assume knownledge of HPACK here._
-
-
-In the following we are mostly concerned with name-value pairs that either
-change the dynamic shared state or references the dynamic shared state.
 
 
 ### Streams
@@ -158,7 +178,7 @@ prefers and whether to use explicit string compression or not, but it
 must of course use a form the decoder is able to make use of.
 
 
-### Name-Value List Codec
+### Name-Value List Encoding
 
 The encoder sends a name-value list as one 'AddField(name, value)'
 message per name-value pair on the SS stream in the same order as the
@@ -196,7 +216,9 @@ code points for explicit string compresion is pre-populated according to
 the specific application.
 
 
-## The Static Table
+## Data Structures
+
+### The Static Table
 
 The static table (ST) is similar to the static table usd in HPACK. It is
 a table of name-value pairs where both content and size is fixed and
@@ -213,7 +235,7 @@ There can be multiple entries with the same name. They can even have the
 same value, although, for static table, that would be pointless.
 
 
-## The Dynamic Table
+### The Dynamic Table
 
 The dynamic table (DT) known from HPACK is also found in APACK in a
 modified form.
@@ -293,7 +315,7 @@ maintain the set of active references, the APACK algorithm is complete
 and only details of wireformat remains.
 
 
-## Timestamps
+### Timestamps
 
 Each session presumably has an application specific session ID
 associated with each SS stream, but we prefer to use our own internal
@@ -326,7 +348,7 @@ sessions. In this case it may, but need not, update the TSR. Updating
 the TSR reduces the chance of early eviction.
 
 
-## Codec with Timestamps
+### Encoding with Timestamps
 
 When the encoder starts sending a sequence of 'AddField(name, value)'
 messages on the current SS stream it first sends a 'SyncRef(TSS, TSU)'
@@ -399,7 +421,7 @@ the slots that are rarely used while avoiding slots that might have been
 update a long time ago, but which are still in active use.
 
 
-## Updating Decoders Dynamic Table
+### Updating Decoders Dynamic Table
 
 So far we have only discussed when it is possible to update the encoders
 table and when it is safe to access the decoders table DT. We still need to
@@ -426,7 +448,7 @@ If an 'UpdateField' message references an invalid slot, the decoder must
 abort immediately abort.
 
 
-# Wrapping Timestamps
+### Wrapping Timestamps
 
 It is fairly easy to handle timestamp wrapping if we are sure that all
 currently relevant timespans are within a range less than half the
@@ -466,7 +488,7 @@ concurrent sessions, perhaps more so than desirable, but it might be
 useful on resource constrained systems.
 
 
-## Resizing the Dynamic Table.
+### Resizing the Dynamic Table.
 
 The encoder can send a 'Resize(N)' message on the control channel to
 indicate that it does have any active references at slots above the
