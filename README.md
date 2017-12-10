@@ -477,19 +477,6 @@ concerned with timestamps at all.
 Thus we can limit the extra space usage on each slot to 32 bits, 16 bits
 for the TSU timestamp and 16 bits for the TSR timestamp.
 
-We can limit the range if our dynamic table size is comparatively small.
-The timestamp only increments with each update, and any TSR refernece
-timestamp cannot be below any valid TSU timestamp because a slot cannot
-be referenced before it is updated. Therefore we only need just over
-double the dynamic table limit for the timestamp representation size.
-
-If we set the upper limit to 30000 entries, we can still have a 16-bit
-timestamp without having to limit the number of concurrent sessions.
-
-If we use an 8-bit timestamp we surely need to limit the number of
-concurrent sessions, perhaps more so than desirable, but it might be
-useful on resource constrained systems.
-
 
 ### Resizing the Dynamic Table.
 
