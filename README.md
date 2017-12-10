@@ -29,7 +29,7 @@ text can be read without any detailed knowledge of HPACK.
     * [Resizing the Dynamic Table.](#resizing-the-dynamic-table)
 * [Active Reference Sets](#active-reference-sets)
 * [Wire Format](#wire-format)
-* [Non-Block Adaptation](#non-block-adaptation)
+* [Non-Blocking Adaptation](#non-blocking-adaptation)
 * [Pros and Cons of APACK](#pros-and-cons-of-apack)
     * [Pros](#pros)
     * [Cons](#cons)
@@ -537,7 +537,7 @@ cannot trivially use the FIFO principle.
 
 
 
-## Non-Block Adaptation
+## Non-Blocking Adaptation
 
 In the basic form, APACK sessions must wait for data to arrive on the
 control stream. We can avoid blocking by performing the following
@@ -604,6 +604,19 @@ NOTE: it may be that we do not need to distinguish between
 'SyncUpdate' and 'SyncUpdateDeferred' messages, because it can probably
 be deduced, but it makes it more clear which kind of operation is going
 on. Likewise with 'SyncUpdateDeferred'.
+
+NOTE: it is likely that we can remove most of the content of the
+deferred update list but it requires more analysis. The messages
+attached to each TSU on the list can probably be applied directly to the
+DT because the respective slots ought to be unused. Since TSU timestamps
+are sequential, we just need to track if we have seen them, which can be
+done with a bitmap or other dense representation.
+
+NOTE: The active wait list that we use when the decoder is waiting for
+content to arrive on the control channel is not needed if we only
+allowed non-blocking mode, i.e. the deferred update variant. The cost
+the of the wait list is likely minimal as it can be an in-place linked
+list directly on each session record, but it is an option.
 
 
 ## Pros and Cons of APACK
