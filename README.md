@@ -29,6 +29,7 @@ text can be read without any detailed knowledge of HPACK.
     * [Resizing the Dynamic Table.](#resizing-the-dynamic-table)
 * [Active Reference Sets](#active-reference-sets)
 * [Wire Format](#wire-format)
+* [Non-Block Adaptation](#non-block-adaptation)
 * [Pros and Cons of APACK](#pros-and-cons-of-apack)
     * [Pros](#pros)
     * [Cons](#cons)
@@ -533,6 +534,76 @@ with HPACK.
 
 The main issue is how to efficiently encode references into DT since we
 cannot trivially use the FIFO principle.
+
+
+
+## Non-Block Adaptation
+
+In the basic form, APACK sessions must wait for data to arrive on the
+control stream. We can avoid blocking by performing the following
+adaptation:
+
+The encoders dynamic table DT keeps a committed flag for each slot
+which is initially reset but will be set once a confirmation is received
+from the decoder. When this bit is set, it is safe to reference the slot
+in a non-blocking form.
+
+When we would earlier send an 'UpdateField' on the CS stream and
+reference that update as an 'AddField(name, value)' reference on the SS
+stream, we replace the 'AddField' message with an 'AddAndUpdateField' on SS
+where we sent the value explicitly and the name explcitly or implicitly
+if the name is already committed in an available slot. We drop the
+'UpdateField' completely on CS. The 'SyncUpdate' message is replaced
+with a 'SyncUpdateDeferred' message on CS with same content. The 'SyncRef'
+message on the SS stream, before any fields are added, is renamed to
+'SyncRefDeferred' with the same content.
+
+When the decoder sees a 'SyncUpdateDeferred' message it pushes the TSU
+timestamp on an ordered list we call the deferred update list (DUL). When a
+'SyncRefDeferred' message is received on the SS stream it is noted that
+the session holds deferred updates. The decoder immediately expands all
+'AddField' and 'AddAndUpdateField' messages but retains the update
+messages by placing them on the deferred update list indexed by TSU. The
+entry might already exist if a 'SyncUpdateDeferred' messages was seen
+but the update messages are added regardless.
+
+The dynamic table is always update in lock step with a single TSU
+timestamp. If the oldest entry on the deferred update list (DUL) is exactly one
+larger than the TSU timestamp, then that entry is removed and the DT
+table is updated with the content of those messages.
+
+In this setup all 'UpdateField' messages seen on the CS stream are
+queued up until we see a 'SyncUpdate' message. These messages are then
+added to the DUL list on the given TSU. If we have no deferred messages,
+this will always be the only and the oldest entry on DUL and therefore
+the DT can be updated immediately, and we the same behavior as before.
+
+If the decoder receives a 'SyncRef' message on the SS stream and there
+are entries on the DUL list that cannot be applied and the last TSU
+timestamp of the DT table is older than the required TSU timestamp, then
+the session is placed on the waiting list as before and processed once
+the DT is updated with the necessary TSU timestamp.
+
+Once the DT table is updated with a given TSU timestamp, the decoder
+sends an 'UpdateCommit(TSU)' message back to the encoder. The encoder
+finds all DT entries with the TSU timestamp and sets the commit flag.
+The encoder might keep a data structure to speed up this operation at
+the implementations discretion, but it must protect against abusive
+input regardless.
+
+If the encoder wants to encode a new name-value pair and realized that
+there is already an uncommitted entry in the DT table it has two
+choices. It can send with 'SyncRef' as before and ignore that the entry
+is uncommitted, or if uses deferred policy, it can send that field as
+an explicit value while the name can be implicit or explicit depending
+on wheher there is a committed name entry available. It SHOULD use an
+'AddField' message rather than 'AddAndUpdate' because it will not useful
+to do a seconary update, though possible.
+
+NOTE: it may be that we do not need to distinguish between
+'SyncUpdate' and 'SyncUpdateDeferred' messages, because it can probably
+be deduced, but it makes it more clear which kind of operation is going
+on. Likewise with 'SyncUpdateDeferred'.
 
 
 ## Pros and Cons of APACK
