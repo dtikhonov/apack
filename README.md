@@ -12,9 +12,10 @@ text can be read without any detailed knowledge of HPACK.
 * [Overview](#overview)
 * [Security Considerations](#security-considerations)
 * [Differences from APACK with bitmaps](#differences-from-apack-with-bitmaps)
-* [Static Encoding](#static-encoding)
+* [Core Concepts](#core-concepts)
     * [Streams](#streams)
     * [Sessions](#sessions)
+    * [Static Encoding](#static-encoding)
     * [Implicit and Explicit Strings](#implicit-and-explicit-strings)
     * [Name-Value List Encoding](#name-value-list-encoding)
 * [Data Structures](#data-structures)
@@ -108,21 +109,7 @@ values. But this can actually be a good thing because the encoder will
 then tend to prefer less recently used slots.
 
 
-## Static Encoding
-
-_We assume knownledge of HPACK here._
-
-APACK has a static dictionary and the ability to send name-value pair as
-explicity data of the SS stream, neither of which affects any state.
-For brewity we skip the details of this encoding but note that the HPACK
-approach can largely be reused with allowance for making header fields
-compatible with the remaining of the APACK communication frames. We
-therefore focus the remaining text on encodings that affect the dynamic
-table also known from HPACK. When, occasionally, space or security
-considerations make encoding using the dynamic table infeasible or
-less preferable, we use the static and explicit communication but
-ultimiately allow an implementation to make its own calls.
-
+## Core Concepts
 
 ### Streams
 
@@ -155,6 +142,22 @@ The decoder can have multiple concurrent sessions but we assume that
 messages received on a SS stream are stored temporarily until it is
 possible to decode an entire session.  This is not necessarily required,
 but it simplifies the discussion.
+
+
+### Static Encoding
+
+_We assume knownledge of HPACK here._
+
+APACK has a static dictionary and the ability to send name-value pair as
+explicity data of the SS stream, neither of which affects any state.
+For brewity we skip the details of this encoding but note that the HPACK
+approach can largely be reused with allowance for making header fields
+compatible with the remaining of the APACK communication frames. We
+therefore focus the remaining text on encodings that affect the dynamic
+table also known from HPACK. When, occasionally, space or security
+considerations make encoding using the dynamic table infeasible or
+less preferable, we use the static and explicit communication but
+ultimiately allow an implementation to make its own calls.
 
 
 ### Implicit and Explicit Strings
